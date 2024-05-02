@@ -18,7 +18,7 @@ func main() {
 	case "decode":
 		bencodedValue := args[0]
 
-		decoded, err := decodeBencode(bencodedValue)
+		decoded, _, err := decodeBencode(bencodedValue)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -32,58 +32,75 @@ func main() {
 	}
 }
 
-func decodeBencode(bencodedString string) (interface{}, error) {
-	if unicode.IsDigit(rune(bencodedString[0])) {
-		return decodeString(bencodedString)
-	} else if bencodedString[0] == 'i' && bencodedString[len(bencodedString)-1] == 'e' {
-		return decodeInt(bencodedString)
-	} else if bencodedString[0] == 'l' && bencodedString[len(bencodedString)-1] == 'e' {
-		return decodeList(bencodedString)
-	} else {
-		return "", fmt.Errorf("invalid bencoded string")
-	}
-}
-
-func decodeString(bencodedString string) (string, error) {
-	firstColonIndex := strings.Index(bencodedString, ":")
-	lengthStr := bencodedString[:firstColonIndex]
-	length, err := strconv.Atoi(lengthStr)
-	if err != nil {
-		return "", err
-	}
-	return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
-}
-
-func decodeInt(bencodedString string) (int, error) {
-	return strconv.Atoi(bencodedString[1 : len(bencodedString)-1])
-}
-
-func decodeList(bencodedString string) ([]interface{}, error) {
-	list := []interface{}{}
-	bencodedString = bencodedString[1 : len(bencodedString)-1]
-
-	for len(bencodedString) > 0 {
-		if bencodedString[0] == 'i' {
-			endIndex := strings.Index(bencodedString, "e")
-			intValue, err := decodeInt(bencodedString[:endIndex+1])
-			if err != nil {
-				return nil, err
-			}
-			list = append(list, intValue)
-			bencodedString = bencodedString[endIndex+1:]
-		} else if unicode.IsDigit(rune(bencodedString[0])) {
-			endIndex := strings.Index(bencodedString, ":")
-			length, _ := strconv.Atoi(bencodedString[:endIndex])
-			strValue, err := decodeString(bencodedString[:endIndex+1+length])
-			if err != nil {
-				return nil, err
-			}
-			list = append(list, strValue)
-			bencodedString = bencodedString[endIndex+1+length:]
+func decodeBencode(bencodedString string) (interface{}, int, error) {
+	switch bencodedString[0] {
+	case 'i':
+		return decodeInt(bencodedString, 0)
+	case 'l':
+		return decodeList(bencodedString, 0)
+	default:
+		if unicode.IsDigit(rune(bencodedString[0])) {
+			return decodeString(bencodedString, 0)
 		} else {
-			fmt.Println("Invalid bencoded string", bencodedString)
-			return nil, fmt.Errorf("invalid bencoded string")
+			return "", -1, fmt.Errorf("invalid bencoded string")
 		}
 	}
-	return list, nil
+}
+
+func decodeString(bencodedString string, pos int) (string, int, error) {
+	firstColonIndex := strings.Index(bencodedString, ":")
+	lengthStr := bencodedString[pos:firstColonIndex]
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil {
+		return "", 0, err
+	}
+	return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], firstColonIndex + length, nil
+}
+
+func decodeInt(bencodedString string, pos int) (int, int, error) {
+	for i := pos; i < len(bencodedString); i++ {
+		if bencodedString[i] == 'e' {
+			decodedInt, err := strconv.Atoi(bencodedString[pos+1 : i])
+			if err != nil {
+				return 0, 0, err
+			}
+			return decodedInt, i, nil
+		}
+	}
+	return 0, 0, fmt.Errorf("invalid bencoded string")
+}
+
+func decodeList(bencodedString string, pos int) ([]interface{}, int, error) {
+	list := []interface{}{}
+	end := 0
+	for i := pos + 1; i < len(bencodedString); i++ {
+		ch := bencodedString[i]
+		// fmt.Printf("i: %d, ch: %c\n", i, ch)
+		if ch == 'e' {
+			end = i
+			break
+		} else if ch == 'i' {
+			decodedInt, endPos, err := decodeInt(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			list = append(list, decodedInt)
+			i = endPos
+		} else if ch == 'l' {
+			decodedList, endPos, err := decodeList(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			list = append(list, decodedList)
+			i = endPos
+		} else if unicode.IsDigit(rune(ch)) {
+			decodedString, endPos, err := decodeString(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			list = append(list, decodedString)
+			i = endPos
+		}
+	}
+	return list, end, nil
 }
