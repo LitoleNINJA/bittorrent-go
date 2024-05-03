@@ -56,12 +56,12 @@ func main() {
 			return
 		}
 
-		fmt.Println("Tracker URL: ", torrent.Announce)
-		fmt.Println("Length: ", torrent.Info.Length)
-		fmt.Println("Info Hash: ", torrent.Info.hash())
-		fmt.Println("Piece Length: ", torrent.Info.PieceLength)
+		fmt.Println("Tracker URL:", torrent.Announce)
+		fmt.Println("Length:", torrent.Info.Length)
+		fmt.Println("Info Hash:", torrent.Info.hash())
+		fmt.Println("Piece Length:", torrent.Info.PieceLength)
 		peiceHashes := hex.EncodeToString([]byte(torrent.Info.Pieces))
-		fmt.Println("Piece Hashes: ")
+		fmt.Println("Piece Hashes:")
 		for i := 0; i < len(peiceHashes); i += 40 {
 			fmt.Println(peiceHashes[i : i+40])
 		}
