@@ -38,6 +38,8 @@ func decodeBencode(bencodedString string) (interface{}, int, error) {
 		return decodeInt(bencodedString, 0)
 	case 'l':
 		return decodeList(bencodedString, 0)
+	case 'd':
+		return decodeDict(bencodedString, 0)
 	default:
 		if unicode.IsDigit(rune(bencodedString[0])) {
 			return decodeString(bencodedString, 0)
@@ -48,7 +50,7 @@ func decodeBencode(bencodedString string) (interface{}, int, error) {
 }
 
 func decodeString(bencodedString string, pos int) (string, int, error) {
-	firstColonIndex := strings.Index(bencodedString, ":")
+	firstColonIndex := strings.Index(bencodedString[pos:], ":") + pos
 	lengthStr := bencodedString[pos:firstColonIndex]
 	length, err := strconv.Atoi(lengthStr)
 	if err != nil {
@@ -75,7 +77,6 @@ func decodeList(bencodedString string, pos int) ([]interface{}, int, error) {
 	end := 0
 	for i := pos + 1; i < len(bencodedString); i++ {
 		ch := bencodedString[i]
-		// fmt.Printf("i: %d, ch: %c\n", i, ch)
 		if ch == 'e' {
 			end = i
 			break
@@ -103,4 +104,68 @@ func decodeList(bencodedString string, pos int) ([]interface{}, int, error) {
 		}
 	}
 	return list, end, nil
+}
+
+func decodeDict(bencodedString string, pos int) (map[string]interface{}, int, error) {
+	dict := make(map[string]interface{})
+	key := ""
+	end := 0
+	for i := pos + 1; i < len(bencodedString); i++ {
+		ch := bencodedString[i]
+		if ch == 'e' {
+			end = i
+			break
+		} else if ch == 'i' {
+			decodedInt, endPos, err := decodeInt(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			i = endPos
+			if key == "" {
+				key = strconv.Itoa(decodedInt)
+			} else {
+				dict[key] = decodedInt
+				key = ""
+			}
+		} else if unicode.IsDigit(rune(ch)) {
+			decodedString, endPos, err := decodeString(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			i = endPos
+			if key == "" {
+				key = decodedString
+			} else {
+				dict[key] = decodedString
+				key = ""
+			}
+		} else if ch == 'l' {
+			decodedList, endPos, err := decodeList(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			i = endPos
+			if key == "" {
+				key = "list"
+			} else {
+				dict[key] = decodedList
+				key = ""
+			}
+		} else if ch == 'd' {
+			decodedDict, endPos, err := decodeDict(bencodedString, i)
+			if err != nil {
+				return nil, -1, err
+			}
+			i = endPos
+			if key == "" {
+				key = "dict"
+			} else {
+				dict[key] = decodedDict
+				key = ""
+			}
+		} else {
+			return nil, -1, fmt.Errorf("invalid bencoded string")
+		}
+	}
+	return dict, end, nil
 }
