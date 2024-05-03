@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/jackpal/bencode-go"
 )
 
 func decodeBencode(bencodedString string) (interface{}, int, error) {
@@ -146,22 +148,72 @@ func decodeDict(bencodedString string, pos int) (map[string]interface{}, int, er
 	return dict, end, nil
 }
 
-func readTorrentFile(torrentFile string) (map[string]interface{}, error) {
+func encodeBencode(data interface{}) (string, error) {
+	switch v := data.(type) {
+	case string:
+		return EncodeString(v)
+	case int:
+		return EncodeNumber(v)
+	case []interface{}:
+		return EncodeList(v)
+	case map[string]interface{}:
+		return EncodeDictionary(v)
+	default:
+		return "", fmt.Errorf("unsupported type: %T", v)
+	}
+}
+
+func EncodeString(data string) (string, error) {
+	return strconv.Itoa(len(data)) + ":" + data, nil
+}
+
+func EncodeNumber(data int) (string, error) {
+	return "i" + strconv.Itoa(data) + "e", nil
+}
+
+func EncodeList(data []interface{}) (string, error) {
+	encodedList := "l"
+	for _, v := range data {
+		encoded, err := encodeBencode(v)
+		if err != nil {
+			return "", err
+		}
+		encodedList += encoded
+	}
+	encodedList += "e"
+	return encodedList, nil
+}
+
+func EncodeDictionary(data map[string]interface{}) (string, error) {
+	encodedDict := "d"
+	for k, v := range data {
+		encodedKey, err := EncodeString(k)
+		if err != nil {
+			return "", err
+		}
+		encodedDict += encodedKey
+		encodedValue, err := encodeBencode(v)
+		if err != nil {
+			return "", err
+		}
+		encodedDict += encodedValue
+	}
+	encodedDict += "e"
+	return encodedDict, nil
+}
+
+func readTorrentFile(torrentFile string) (Torrent, error) {
 	file, err := os.Open(torrentFile)
 	if err != nil {
-		return nil, err
+		return Torrent{}, err
 	}
 	defer file.Close()
 
-	data, err := os.ReadFile(torrentFile)
+	var torrent Torrent
+	err = bencode.Unmarshal(file, &torrent)
 	if err != nil {
-		return nil, err
+		return Torrent{}, err
 	}
 
-	// fmt.Println("File Data: ", string(data))
-	decoded, _, err := decodeBencode(string(data))
-	if err != nil {
-		return nil, err
-	}
-	return decoded.(map[string]interface{}), nil
+	return torrent, nil
 }
