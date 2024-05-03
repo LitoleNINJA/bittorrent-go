@@ -214,6 +214,5 @@ func readTorrentFile(torrentFile string) (Torrent, error) {
 	if err != nil {
 		return Torrent{}, err
 	}
-
 	return torrent, nil
 }
