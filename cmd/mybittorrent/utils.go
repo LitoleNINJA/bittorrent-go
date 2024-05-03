@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -215,4 +217,35 @@ func readTorrentFile(torrentFile string) (Torrent, error) {
 		return Torrent{}, err
 	}
 	return torrent, nil
+}
+
+func requestPeers(req trackerRequest) (trackerResponse, error) {
+	client := &http.Client{}
+	url, err := url.Parse(req.URL)
+	if err != nil {
+		return trackerResponse{}, err
+	}
+	q := url.Query()
+	q.Add("info_hash", req.InfoHash)
+	q.Add("peer_id", req.PeerID)
+	q.Add("port", strconv.Itoa(req.Port))
+	q.Add("uploaded", strconv.Itoa(req.Uploaded))
+	q.Add("downloaded", strconv.Itoa(req.Downloaded))
+	q.Add("left", strconv.Itoa(req.Left))
+	q.Add("compact", strconv.Itoa(req.Compact))
+	url.RawQuery = q.Encode()
+
+	resp, err := client.Get(url.String())
+	if err != nil {
+		return trackerResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	var trackerResponse trackerResponse
+	err = bencode.Unmarshal(resp.Body, &trackerResponse)
+	if err != nil {
+		return trackerResponse, err
+	}
+
+	return trackerResponse, nil
 }
