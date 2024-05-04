@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -219,6 +220,19 @@ func readTorrentFile(torrentFile string) (Torrent, error) {
 	return torrent, nil
 }
 
+func makeTrackerRequest(torrent Torrent) trackerRequest {
+	return trackerRequest{
+		URL:        torrent.Announce,
+		InfoHash:   string(torrent.Info.hash()),
+		PeerID:     "00112233445566778899",
+		Port:       6881,
+		Uploaded:   0,
+		Downloaded: 0,
+		Left:       torrent.Info.Length,
+		Compact:    1,
+	}
+}
+
 func requestPeers(req trackerRequest) (trackerResponse, error) {
 	client := &http.Client{}
 	url, err := url.Parse(req.URL)
@@ -248,4 +262,43 @@ func requestPeers(req trackerRequest) (trackerResponse, error) {
 	}
 
 	return trackerResponse, nil
+}
+
+func makeHandshakeMsg(hadnshake handshake) []byte {
+	var msg []byte
+	msg = append(msg, hadnshake.length)
+	msg = append(msg, hadnshake.pstr...)
+	msg = append(msg, hadnshake.resv[:]...)
+	msg = append(msg, hadnshake.info[:]...)
+	msg = append(msg, hadnshake.peerId[:]...)
+	return msg
+}
+
+func connectWithPeer(peerIp string, peerPort string, msg []byte) (handshake, error) {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", peerIp, peerPort))
+	if err != nil {
+		return handshake{}, err
+	}
+	defer conn.Close()
+
+	_, err = conn.Write(msg)
+	if err != nil {
+		return handshake{}, err
+	}
+
+	// Read the handshake response
+	resp := make([]byte, 68)
+	_, err = conn.Read(resp)
+	if err != nil {
+		return handshake{}, err
+	}
+
+	// fmt.Println("Handshake response:", string(resp))
+	return handshake{
+		length: resp[0],
+		pstr:   string(resp[1:20]),
+		resv:   [8]byte{},
+		info:   resp[28:48],
+		peerId: resp[48:68],
+	}, nil
 }

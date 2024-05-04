@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jackpal/bencode-go"
 )
@@ -37,6 +38,14 @@ type trackerRequest struct {
 type trackerResponse struct {
 	Interval int    `bencode:"interval"`
 	Peers    string `bencode:"peers"`
+}
+
+type handshake struct {
+	length byte
+	pstr   string
+	resv   [8]byte
+	info   []byte
+	peerId []byte
 }
 
 func (info Info) hexHash() *bytes.Buffer {
@@ -96,16 +105,7 @@ func main() {
 			return
 		}
 
-		trackerRequest := trackerRequest{
-			URL:        torrent.Announce,
-			InfoHash:   string(torrent.Info.hash()),
-			PeerID:     "00112233445566778899",
-			Port:       6881,
-			Uploaded:   0,
-			Downloaded: 0,
-			Left:       torrent.Info.Length,
-			Compact:    1,
-		}
+		trackerRequest := makeTrackerRequest(torrent)
 
 		peers, err := requestPeers(trackerRequest)
 		if err != nil {
@@ -120,6 +120,29 @@ func main() {
 			peerIps += fmt.Sprintf("%s:%d\n", ip, port)
 		}
 		fmt.Println(peerIps)
+	case "handshake":
+		torrentFile := args[0]
+		peerData := strings.Split(args[1], ":")
+		peerIp, peerPort := peerData[0], peerData[1]
+		torrent, err := readTorrentFile(torrentFile)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		handshakeMsg := makeHandshakeMsg(handshake{
+			length: byte(19),
+			pstr:   "BitTorrent protocol",
+			resv:   [8]byte{},
+			info:   torrent.Info.hash(),
+			peerId: []byte("00112233445566778899"),
+		})
+		respHandshake, err := connectWithPeer(peerIp, peerPort, handshakeMsg)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println("Peer ID:", hex.EncodeToString(respHandshake.peerId))
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
