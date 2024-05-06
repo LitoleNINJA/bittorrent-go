@@ -306,7 +306,7 @@ func connectWithPeer(peerIp string, peerPort string, msg []byte) (net.Conn, hand
 	}, nil
 }
 
-func downloadFile(conn net.Conn, torrent Torrent, index int) []byte {
+func downloadPiece(conn net.Conn, torrent Torrent, index int) []byte {
 	defer conn.Close()
 
 	// wait for the bitfield message (id = 5)
@@ -327,7 +327,7 @@ func downloadFile(conn net.Conn, torrent Torrent, index int) []byte {
 	}
 	peerMessage.id = payloadBuf[0]
 
-	fmt.Printf("Received message: %v\n", peerMessage)
+	// fmt.Printf("Received message: %v\n", peerMessage)
 	if peerMessage.id != 5 {
 		fmt.Println("Expected bitfield message")
 		return nil
@@ -357,7 +357,7 @@ func downloadFile(conn net.Conn, torrent Torrent, index int) []byte {
 	}
 	peerMessage.id = payloadBuf[0]
 
-	fmt.Printf("Received message: %v\n", peerMessage)
+	// fmt.Printf("Received message: %v\n", peerMessage)
 	if peerMessage.id != 1 {
 		fmt.Println(buf)
 		fmt.Println("Expected unchoke message")
@@ -373,7 +373,7 @@ func downloadFile(conn net.Conn, torrent Torrent, index int) []byte {
 	}
 	blockSize := 16 * 1024
 	blockCnt := int(math.Ceil(float64(pieceSize) / float64(blockSize)))
-	fmt.Printf("File Length: %d, Piece Length: %d, Piece Count: %d, Block Size: %d, Block Count: %d\n", torrent.Info.Length, torrent.Info.PieceLength, pieceCnt, blockSize, blockCnt)
+	// fmt.Printf("File Length: %d, Piece Length: %d, Piece Count: %d, Block Size: %d, Block Count: %d\n", torrent.Info.Length, torrent.Info.PieceLength, pieceCnt, blockSize, blockCnt)
 	var data []byte
 	for i := 0; i < blockCnt; i++ {
 		blockLength := blockSize
@@ -395,7 +395,7 @@ func downloadFile(conn net.Conn, torrent Torrent, index int) []byte {
 			fmt.Println(err)
 			return nil
 		}
-		fmt.Println("Sent request message", peerMessage)
+		// fmt.Println("Sent request message", peerMessage)
 
 		// wait for piece message (id = 7)
 		resBuf := make([]byte, 4)
@@ -414,7 +414,7 @@ func downloadFile(conn net.Conn, torrent Torrent, index int) []byte {
 			return nil
 		}
 		peerMessage.id = payloadBuf[0]
-		fmt.Printf("Received message: %v\n", peerMessage)
+		// fmt.Printf("Received message: %v\n", peerMessage)
 
 		data = append(data, payloadBuf[9:]...)
 	}
