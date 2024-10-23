@@ -281,6 +281,15 @@ func main() {
 		}
 
 		fmt.Printf("Downloaded %s to %s.\n", torrentFile, outputFile)
+	case "magnet_parse":
+		mangetLink, err := parseMagentLink(args[0])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Println("Tracker URL:", mangetLink.trackerURL)
+		fmt.Println("Info Hash:", mangetLink.infoHash)
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
